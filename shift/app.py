@@ -87,12 +87,12 @@ lang_dict = {
         "loc_settings": "📍 2. 拠点設定", "loc_count": "拠点数", "loc_name": "拠点名", "loc_min": "人数", "closed_days": "休業曜日",
         "staff_settings": "👤 勤務者詳細設定", "name": "氏名", "affiliation": "所属", "hq_staff": "本社", "disp_staff": "派遣", "possible_locs": "投入可能拠点", 
         "total_off": "休日数", "off_req": "希望休日 (カレンダー)", "hq_req": "本社出勤日",
-        "load_save": "💾 データ管理", "upload": "バック업 업로드", "backup_btn": "📥 全設定をバックアップ",
+        "load_save": "💾 データ管理", "upload": "バックアップアップロード", "backup_btn": "📥 全設定をバックアップ",
         "template_msg": "📁 様式アップロード", "result_title": "📊 結果", "hq_col": "★本社出勤★", "shortage": "⚠️不足", "loc_off": "X (休み)",
         "time_set": "⏰ 時間", "start": "開始", "end": "終了", "msg_load": "✅ ロード成功", "msg_done": "✅ 生成完了"
     },
     "한국어": {
-        "co_name": "株式会社NEXTスタッフ서비스", "group_name": "Enrich MR Holdings", "author": "제작자: HWANG YOUNGSEON",
+        "co_name": "株式会社NEXTスタッフサービス", "group_name": "Enrich MR Holdings", "author": "제작자: HWANG YOUNGSEON",
         "run_btn": "🚀 2026년 통합 근무표 생성", "download": "📥 근무표 다운로드",
         "settings": "⚙️ 1. 기본 설정", "days": "대상 월", "num_staff": "전체 인원", 
         "loc_settings": "📍 2. 거점 설정", "loc_count": "거점 개수", "loc_name": "거점명", "loc_min": "인원", "closed_days": "휴무 요일",
