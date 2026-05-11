@@ -3,25 +3,27 @@ import pandas as pd
 import random
 from datetime import datetime, date, time
 import io
+import os
 import holidays
 import ast
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
+# --- [서버 임시저장 파일명 설정] ---
+TEMP_FILE = ".temp_backup.xlsx"
+
 # --- [パスワードロック設定 (비밀번호 잠금 설정)] ---
 def check_password():
-    """パスワードが正しければTrueを返します。"""
     def password_entered():
-        # 👇 ここに希望する社内パスワードを設定してください (여기에 사내 비밀번호를 설정하세요. 예: NEXT2026)
-        if st.session_state["password"] == "nextss":
+        if st.session_state.get("password", "") == "NEXT2026":
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # セキュリティのため削除
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
         st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🏢 NEXT STAFF SERVICE</h2>", unsafe_allow_html=True)
-        st.text_input("社内共通パスワードを入力してください", type="password", on_change=password_entered, key="password")
+        st.text_input("社内共通パスワードを入力してください (NEXT2026)", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
         st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🏢 NEXT STAFF SERVICE</h2>", unsafe_allow_html=True)
@@ -30,59 +32,71 @@ def check_password():
     return True
 
 if not check_password():
-    st.stop() # パスワードを入力するまでは下のコードを実行しない
+    st.stop()
 
 # --- [0] 기본 설정 및 세션 초기화 ---
 st.set_page_config(page_title="2026 Smart Scheduler", layout="wide", page_icon="📅")
+
+def apply_backup_data(xls):
+    """엑셀 데이터를 읽어 세션(화면)에 즉시 복구하는 핵심 엔진"""
+    if 'Locations' in xls.sheet_names:
+        df_loc = pd.read_excel(xls, sheet_name='Locations')
+        loc_list = df_loc.to_dict('records')
+        st.session_state['loc_count_val'] = len(loc_list)
+        for i, loc in enumerate(loc_list):
+            st.session_state[f"ln_{i}"] = str(loc.get('loc_name', f"LOC {i+1}"))
+            st.session_state[f"lm_{i}"] = int(loc.get('loc_min', 1))
+            c_days = loc.get('closed_days', [])
+            if isinstance(c_days, str):
+                try: c_days = ast.literal_eval(c_days)
+                except: c_days = []
+            st.session_state[f"lc_{i}"] = c_days
+
+    staff_sheet = 'Staff' if 'Staff' in xls.sheet_names else ('Sheet1' if 'Sheet1' in xls.sheet_names else None)
+    if staff_sheet:
+        df_staff = pd.read_excel(xls, sheet_name=staff_sheet)
+        staff_list = df_staff.to_dict('records')
+        st.session_state['num_staff_val'] = len(staff_list)
+        for i, row in enumerate(staff_list):
+            s_name = row.get('pure_name', row.get('name', f"Staff{i+1}"))
+            st.session_state[f"sn_{i}"] = str(s_name)
+            st.session_state[f"af_{i}"] = str(row.get('affiliation', "本社"))
+            st.session_state[f"to_{i}"] = int(row.get('target_off', 8))
+            
+            shift_str = str(row.get('shift', '09:00-18:00'))
+            try:
+                s_st, s_et = shift_str.split('-')
+                st.session_state[f"st_{i}"] = datetime.strptime(s_st.strip(), "%H:%M").time()
+                st.session_state[f"et_{i}"] = datetime.strptime(s_et.strip(), "%H:%M").time()
+            except:
+                pass
+
+            for key_prefix, col_name in [("or", "off_list"), ("hr", "hq_list"), ("sl", "possible_locs")]:
+                val = row.get(col_name, [])
+                if isinstance(val, str):
+                    try: val = ast.literal_eval(val)
+                    except: val = []
+                st.session_state[f"{key_prefix}_{i}"] = val
 
 def handle_upload():
     uploader = st.session_state.get('file_uploader_key')
     if uploader is not None:
         try:
             xls = pd.ExcelFile(uploader)
-            # 1. 거점 정보 복구
-            if 'Locations' in xls.sheet_names:
-                df_loc = pd.read_excel(xls, sheet_name='Locations')
-                for i, loc in enumerate(df_loc.to_dict('records')):
-                    st.session_state[f"ln_{i}"] = str(loc.get('loc_name', f"LOC {i+1}"))
-                    st.session_state[f"lm_{i}"] = int(loc.get('loc_min', 1))
-                    c_days = loc.get('closed_days', [])
-                    if isinstance(c_days, str):
-                        try: c_days = ast.literal_eval(c_days)
-                        except: c_days = []
-                    st.session_state[f"lc_{i}"] = c_days
-
-            # 2. 직원 정보 복구
-            staff_sheet = 'Staff' if 'Staff' in xls.sheet_names else ('Sheet1' if 'Sheet1' in xls.sheet_names else None)
-            if staff_sheet:
-                df_staff = pd.read_excel(xls, sheet_name=staff_sheet)
-                staff_list = df_staff.to_dict('records')
-                st.session_state['num_staff_val'] = len(staff_list)
-                for i, row in enumerate(staff_list):
-                    # 신버전(pure_name)과 구버전(name) 호환
-                    s_name = row.get('pure_name', row.get('name', f"Staff{i+1}"))
-                    st.session_state[f"sn_{i}"] = str(s_name)
-                    st.session_state[f"af_{i}"] = str(row.get('affiliation', "本社"))
-                    st.session_state[f"to_{i}"] = int(row.get('target_off', 8))
-                    
-                    # 시간 복구
-                    shift_str = str(row.get('shift', '09:00-18:00'))
-                    try:
-                        s_st, s_et = shift_str.split('-')
-                        st.session_state[f"st_{i}"] = datetime.strptime(s_st.strip(), "%H:%M").time()
-                        st.session_state[f"et_{i}"] = datetime.strptime(s_et.strip(), "%H:%M").time()
-                    except:
-                        pass
-
-                    for key_prefix, col_name in [("or", "off_list"), ("hr", "hq_list"), ("sl", "possible_locs")]:
-                        val = row.get(col_name, [])
-                        if isinstance(val, str):
-                            try: val = ast.literal_eval(val)
-                            except: val = []
-                        st.session_state[f"{key_prefix}_{i}"] = val
+            apply_backup_data(xls)
             st.session_state['upload_msg'] = "success"
         except Exception as e:
             st.session_state['upload_msg'] = f"error: {e}"
+
+# --- [새로고침 현상유지: 첫 접속 시 임시파일 자동 로드] ---
+if 'init_load' not in st.session_state:
+    st.session_state['init_load'] = True
+    if os.path.exists(TEMP_FILE):
+        try:
+            xls = pd.ExcelFile(TEMP_FILE)
+            apply_backup_data(xls)
+        except:
+            pass
 
 try: jp_holidays = holidays.Japan(years=2026)
 except: jp_holidays = {}
@@ -97,8 +111,10 @@ lang_dict = {
         "settings": "⚙️ 1. 設定", "days": "対象月", "num_staff": "全人員", 
         "loc_settings": "📍 2. 拠点設定", "loc_count": "拠点数", "loc_name": "拠点名", "loc_min": "人数", "closed_days": "休業曜日",
         "staff_settings": "👤 勤務者詳細設定", "name": "氏名", "affiliation": "所属", "hq_staff": "本社", "disp_staff": "派遣", "possible_locs": "投入可能拠点", 
-        "total_off": "休日数", "off_req": "希望休日 (カレンダー)", "hq_req": "本社出勤日",
-        "load_save": "💾 データ管理", "upload": "バックアップ アップロード", "backup_btn": "📥 全設定をバックアップ",
+        "total_off": "休日数", "off_req": "希望休日", "hq_req": "本社出勤日",
+        "load_save": "💾 データ管理", "upload": "バックアップ アップロード", "backup_btn": "📥 PCにフルバックアップ",
+        "temp_save_title": "⏳ 一時保存 (更新しても維持)", "temp_save_btn": "💾 一時保存", "temp_clear_btn": "🗑️ 初期化",
+        "temp_save_ok": "✅ 状態を一時保存しました！(F5を押しても消えません)", "temp_clear_ok": "✅ 完全に初期化されました！",
         "template_msg": "📁 様式アップロード", "result_title": "📊 結果", "hq_col": "★本社出勤★", "shortage": "⚠️不足", "loc_off": "X (休み)",
         "time_set": "⏰ 勤務時間", "start": "開始", "end": "終了", "msg_load": "✅ ロード成功", "msg_done": "✅ 生成完了"
     },
@@ -109,7 +125,9 @@ lang_dict = {
         "loc_settings": "📍 2. 거점 설정", "loc_count": "거점 개수", "loc_name": "거점명", "loc_min": "인원", "closed_days": "휴무 요일",
         "staff_settings": "👤 근무자 상세 설정", "name": "성함", "affiliation": "소속", "hq_staff": "본사", "disp_staff": "파견", "possible_locs": "투입 가능 거점", 
         "total_off": "목표 휴무", "off_req": "희망 휴일", "hq_req": "본사 출사일",
-        "load_save": "💾 데이터 관리", "upload": "백업 업로드", "backup_btn": "📥 모든 설정 백업하기",
+        "load_save": "💾 데이터 관리", "upload": "백업 업로드", "backup_btn": "📥 PC에 풀 백업하기",
+        "temp_save_title": "⏳ 일시저장 (새로고침 복구)", "temp_save_btn": "💾 일시저장", "temp_clear_btn": "🗑️ 싹 지우기",
+        "temp_save_ok": "✅ 서버에 일시저장 완료! (새로고침해도 유지됩니다)", "temp_clear_ok": "✅ 완전히 초기화되었습니다!",
         "template_msg": "📁 양식 업로드", "result_title": "📊 결과", "hq_col": "★본사출사★", "shortage": "⚠️부족", "loc_off": "X (휴무)",
         "time_set": "⏰ 시간", "start": "시작", "end": "종료", "msg_load": "✅ 로드 성공", "msg_done": "✅ 완료"
     }
@@ -133,7 +151,7 @@ st.sidebar.header(L["load_save"])
 st.sidebar.file_uploader(L["upload"], type=["xlsx"], key="file_uploader_key", on_change=handle_upload)
 template_file = st.sidebar.file_uploader(L["template_msg"], type=["xlsx"])
 
-target_month = st.sidebar.number_input(L["days"], 1, 12, 1)
+target_month = st.sidebar.number_input(L["days"], 1, 12, value=st.session_state.get("target_month", 1), key="target_month")
 days_in_month = 28 if target_month == 2 else (30 if target_month in [4,6,9,11] else 31)
 
 def format_day(d):
@@ -201,6 +219,27 @@ if staff_data:
         loc_backup = [{"loc_name": k, "loc_min": v['min'], "closed_days": str(v['closed'])} for k, v in location_configs.items()]
         pd.DataFrame(loc_backup).to_excel(writer, index=False, sheet_name='Locations')
     st.sidebar.download_button(L["backup_btn"], out_cfg.getvalue(), f"full_backup.xlsx")
+
+    # ✨ 일시저장 & 초기화 컨트롤 버튼 (사이드바)
+    st.sidebar.divider()
+    st.sidebar.markdown(f"**{L['temp_save_title']}**")
+    c_s1, c_s2 = st.sidebar.columns(2)
+    
+    if c_s1.button(L["temp_save_btn"]):
+        with pd.ExcelWriter(TEMP_FILE, engine='openpyxl') as writer:
+            pd.DataFrame(staff_data).drop(columns=['name']).to_excel(writer, index=False, sheet_name='Staff')
+            loc_backup = [{"loc_name": k, "loc_min": v['min'], "closed_days": str(v['closed'])} for k, v in location_configs.items()]
+            pd.DataFrame(loc_backup).to_excel(writer, index=False, sheet_name='Locations')
+        st.sidebar.success(L["temp_save_ok"])
+        
+    if c_s2.button(L["temp_clear_btn"]):
+        if os.path.exists(TEMP_FILE):
+            os.remove(TEMP_FILE)
+        # 보안을 위해 비밀번호 상태만 남기고 모든 세션 초기화
+        for key in list(st.session_state.keys()):
+            if key not in ["password", "password_correct"]:
+                del st.session_state[key]
+        st.rerun()
 
 if st.button(L["run_btn"]):
     schedule_results = []; holiday_list = []
