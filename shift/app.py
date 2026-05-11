@@ -12,14 +12,13 @@ from openpyxl.styles import Font
 st.set_page_config(page_title="2026 Smart Scheduler", layout="wide", page_icon="📅")
 
 def handle_upload():
-    if st.session_state.get('file_uploader_key') is not None:
+    uploader = st.session_state.get('file_uploader_key')
+    if uploader is not None:
         try:
-            xls = pd.ExcelFile(st.session_state.file_uploader_key)
+            xls = pd.ExcelFile(uploader)
             if 'Locations' in xls.sheet_names:
                 df_loc = pd.read_excel(xls, sheet_name='Locations')
-                loc_list = df_loc.to_dict('records')
-                st.session_state['loc_count_val'] = len(loc_list)
-                for i, loc in enumerate(loc_list):
+                for i, loc in enumerate(df_loc.to_dict('records')):
                     st.session_state[f"ln_{i}"] = str(loc.get('loc_name', f"LOC {i+1}"))
                     st.session_state[f"lm_{i}"] = int(loc.get('loc_min', 1))
                     c_days = loc.get('closed_days', [])
@@ -53,7 +52,6 @@ except: jp_holidays = {}
 weekdays_ko = ["월", "화", "수", "목", "금", "토", "일"]
 weekdays_jp = ["月", "火", "水", "木", "金", "土", "日"]
 
-# --- [1] 다국어 설정 ---
 lang_dict = {
     "日本語": {
         "co_name": "株式会社NEXTスタッフサービス", "group_name": "Enrich MR Holdings", "author": "制作: HWANG YOUNGSEON",
@@ -62,9 +60,9 @@ lang_dict = {
         "loc_settings": "📍 2. 拠点設定", "loc_count": "拠点数", "loc_name": "拠点名", "loc_min": "人数", "closed_days": "休業曜日",
         "staff_settings": "👤 勤務者詳細設定", "name": "氏名", "affiliation": "所属", "hq_staff": "本社", "disp_staff": "派遣", "possible_locs": "投入可能拠点", 
         "total_off": "休日数", "off_req": "希望休日 (カレンダー)", "hq_req": "本社出勤日",
-        "load_save": "💾 データ管理", "upload": "バック업 업로드", "backup_btn": "📥 설정 백업",
-        "template_msg": "📁 양식 업로드", "result_title": "📊 결과", "hq_col": "★本社出勤★", "shortage": "⚠️부족", "loc_off": "X",
-        "time_set": "⏰ 시간", "start": "시작", "end": "종료", "msg_load": "✅ 로드 성공", "msg_done": "✅ 완료"
+        "load_save": "💾 データ管理", "upload": "バック업 업로드", "backup_btn": "📥 全設定をバックアップ",
+        "template_msg": "📁 様式アップロード", "result_title": "📊 結果", "hq_col": "★本社出勤★", "shortage": "⚠️不足", "loc_off": "X (休み)",
+        "time_set": "⏰ 時間", "start": "開始", "end": "終了", "msg_load": "✅ ロード成功", "msg_done": "✅ 生成完了"
     },
     "한국어": {
         "co_name": "株式会社NEXTスタッフ서비스", "group_name": "Enrich MR Holdings", "author": "제작자: HWANG YOUNGSEON",
@@ -73,8 +71,8 @@ lang_dict = {
         "loc_settings": "📍 2. 거점 설정", "loc_count": "거점 개수", "loc_name": "거점명", "loc_min": "인원", "closed_days": "휴무 요일",
         "staff_settings": "👤 근무자 상세 설정", "name": "성함", "affiliation": "소속", "hq_staff": "본사", "disp_staff": "파견", "possible_locs": "투입 가능 거점", 
         "total_off": "목표 휴무", "off_req": "희망 휴일", "hq_req": "본사 출사일",
-        "load_save": "💾 데이터 관리", "upload": "백업 업로드", "backup_btn": "📥 설정 백업",
-        "template_msg": "📁 양식 업로드", "result_title": "📊 결과", "hq_col": "★본사출사★", "shortage": "⚠️부족", "loc_off": "X",
+        "load_save": "💾 데이터 관리", "upload": "백업 업로드", "backup_btn": "📥 모든 설정 백업하기",
+        "template_msg": "📁 양식 업로드", "result_title": "📊 결과", "hq_col": "★본사출사★", "shortage": "⚠️부족", "loc_off": "X (휴무)",
         "time_set": "⏰ 시간", "start": "시작", "end": "종료", "msg_load": "✅ 로드 성공", "msg_done": "✅ 완료"
     }
 }
@@ -104,64 +102,64 @@ def format_day(d):
     curr_d = date(2026, target_month, d)
     return f"{d} ({weekdays_active[curr_d.weekday()]})"
 
-# --- [초기화 블록] 에러 방지를 위해 위젯 생성 전 모든 키를 점검합니다 ---
-num_staff = st.sidebar.slider(L["num_staff"], 1, 30, value=st.session_state.get('num_staff_val', 10), key='num_staff_val')
 num_locations = st.sidebar.number_input(L["loc_count"], 1, 10, value=st.session_state.get('loc_count_val', 4), key='loc_count_val')
-
-affil_options = [L["hq_staff"], L["disp_staff"]]
-
-for i in range(num_staff):
-    if f"sn_{i}" not in st.session_state: st.session_state[f"sn_{i}"] = f"Staff{i+1}"
-    if f"af_{i}" not in st.session_state: st.session_state[f"af_{i}"] = affil_options[0]
-    if f"to_{i}" not in st.session_state: st.session_state[f"to_{i}"] = 8
-    if f"or_{i}" not in st.session_state: st.session_state[f"or_{i}"] = []
-    if f"hr_{i}" not in st.session_state: st.session_state[f"hr_{i}"] = []
-    if f"sl_{i}" not in st.session_state: st.session_state[f"sl_{i}"] = []
-
-# --- [4] UI 렌더링 ---
 location_names = []; location_configs = {}
 for i in range(num_locations):
     with st.sidebar.expander(f"📍 {L['loc_name']} {i+1}", expanded=False):
-        l_name = st.text_input(L["loc_name"], key=f"ln_{i}")
-        l_min = st.number_input(L["loc_min"], 0, 10, key=f"lm_{i}")
+        l_name = st.text_input(L["loc_name"], key=f"ln_{i}", value=st.session_state.get(f"ln_{i}", f"LOC {i+1}"))
+        l_min = st.number_input(L["loc_min"], 0, 10, key=f"lm_{i}", value=st.session_state.get(f"lm_{i}", 1))
+        
         saved_closed = st.session_state.get(f"lc_{i}", [])
-        l_closed_display = st.multiselect(L["closed_days"], weekdays_active, default=[weekdays_active[weekdays_ko.index(d)] for d in saved_closed if d in weekdays_ko], key=f"lc_disp_{i}")
+        default_idx = [weekdays_ko.index(d) for d in saved_closed if d in weekdays_ko]
+        l_closed_display = st.multiselect(L["closed_days"], weekdays_active, default=[weekdays_active[idx] for idx in default_idx], key=f"lc_disp_{i}")
+        
         l_closed = [weekdays_ko[weekdays_active.index(d)] for d in l_closed_display]
         st.session_state[f"lc_{i}"] = l_closed
         if l_name: location_names.append(l_name); location_configs[l_name] = {"min": l_min, "closed": l_closed}
 
+num_staff = st.sidebar.slider(L["num_staff"], 1, 30, value=st.session_state.get('num_staff_val', 10), key='num_staff_val')
 st.header(L["staff_settings"])
 staff_data = []
 c1, c2 = st.columns(2)
+affil_options = [L["hq_staff"], L["disp_staff"]]
 
 for i in range(num_staff):
-    # 소속 정보가 현재 언어와 맞지 않으면(백업 로드 직후 등) 안전하게 보정합니다.
-    current_val = st.session_state[f"af_{i}"]
-    if current_val not in affil_options:
-        if current_val in ["本社", "본사"]: st.session_state[f"af_{i}"] = L["hq_staff"]
-        else: st.session_state[f"af_{i}"] = L["disp_staff"]
+    # ✨ 절대 에러가 나지 않도록 .get()으로 모든 데이터를 감쌉니다.
+    curr_sn = st.session_state.get(f"sn_{i}", f"Staff{i+1}")
+    curr_af = st.session_state.get(f"af_{i}", affil_options[0])
+    curr_to = st.session_state.get(f"to_{i}", 8)
+    curr_or = st.session_state.get(f"or_{i}", [])
+    curr_hr = st.session_state.get(f"hr_{i}", [])
+    curr_sl = st.session_state.get(f"sl_{i}", [])
+    
+    # 언어 호환성 보정
+    if curr_af not in affil_options:
+        curr_af = L["hq_staff"] if curr_af in ["本社", "본사"] else L["disp_staff"]
+        
+    # 날짜 범위 이탈 방지 보정
+    curr_or = [d for d in curr_or if 1 <= d <= days_in_month]
+    curr_hr = [d for d in curr_hr if 1 <= d <= days_in_month]
 
-    with (c1 if i % 2 == 0 else c2).expander(f"👤 {st.session_state[f'sn_{i}']}", expanded=False):
+    with (c1 if i % 2 == 0 else c2).expander(f"👤 {curr_sn}", expanded=False):
         col_n, col_a = st.columns([2, 1])
-        s_name = col_n.text_input(L["name"], key=f"sn_{i}", label_visibility="collapsed")
-        s_affil = col_a.selectbox(L["affiliation"], affil_options, key=f"af_{i}", label_visibility="collapsed")
+        
+        # 위젯 생성 (초기화된 안전한 값 주입)
+        s_name = col_n.text_input(L["name"], value=curr_sn, key=f"sn_{i}", label_visibility="collapsed")
+        
+        af_idx = affil_options.index(curr_af) if curr_af in affil_options else 0
+        s_affil = col_a.selectbox(L["affiliation"], affil_options, index=af_idx, key=f"af_{i}", label_visibility="collapsed")
         
         tc1, tc2 = st.columns(2)
         st_t = tc1.time_input(L["start"], value=time(9, 0), key=f"st_{i}")
         et_t = tc2.time_input(L["end"], value=time(18, 0), key=f"et_{i}")
         shift_str = f"{st_t.strftime('%H:%M')}-{et_t.strftime('%H:%M')}"
         
-        s_locs = st.multiselect(L["possible_locs"], location_names, key=f"sl_{i}")
-        t_off = st.number_input(L["total_off"], 0, 20, key=f"to_{i}")
+        s_locs = st.multiselect(L["possible_locs"], location_names, default=[loc for loc in curr_sl if loc in location_names], key=f"sl_{i}")
+        t_off = st.number_input(L["total_off"], 0, 20, value=curr_to, key=f"to_{i}")
+        off_l = st.multiselect(L["off_req"], range(1, days_in_month + 1), default=curr_or, key=f"or_{i}", format_func=format_day)
+        hq_l = st.multiselect(L["hq_req"], range(1, days_in_month + 1), default=curr_hr, key=f"hr_{i}", format_func=format_day)
         
-        # 날짜 범위 안전 처리 (월 변경 시 이탈 방지)
-        st.session_state[f"or_{i}"] = [d for d in st.session_state[f"or_{i}"] if 1 <= d <= days_in_month]
-        st.session_state[f"hr_{i}"] = [d for d in st.session_state[f"hr_{i}"] if 1 <= d <= days_in_month]
-        
-        off_l = st.multiselect(L["off_req"], range(1, days_in_month + 1), key=f"or_{i}", format_func=format_day)
-        hq_l = st.multiselect(L["hq_req"], range(1, days_in_month + 1), key=f"hr_{i}", format_func=format_day)
-        
-        staff_data.append({"name": s_name, "pure_name": s_name, "affiliation": s_affil, "shift": shift_str, "possible_locs": s_locs, "target_off": t_off, "off_list": off_l, "hq_list": hq_l})
+        staff_data.append({"name": f"{s_name} ({s_affil})", "pure_name": s_name, "affiliation": s_affil, "shift": shift_str, "possible_locs": s_locs, "target_off": t_off, "off_list": off_l, "hq_list": hq_l})
 
 if staff_data:
     out_cfg = io.BytesIO()
