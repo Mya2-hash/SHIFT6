@@ -8,29 +8,31 @@ import ast
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
-# --- [비밀번호 잠금 화면 설정] ---
+# --- [パスワードロック設定 (비밀번호 잠금 설정)] ---
 def check_password():
-    """비밀번호가 맞으면 True를 반환합니다."""
+    """パスワードが正しければTrueを返します。"""
     def password_entered():
-        # 👇 여기에 원하는 사내 공용 비밀번호를 설정하세요 (예: NEXT2026)
+        # 👇 ここに希望する社内パスワードを設定してください (여기에 사내 비밀번호를 설정하세요. 예: NEXT2026)
         if st.session_state["password"] == "NEXT2026":
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # 보안을 위해 입력한 비밀번호 삭제
+            del st.session_state["password"]  # セキュリティのため削除 (보안을 위해 삭제)
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
         st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🏢 NEXT STAFF SERVICE</h2>", unsafe_allow_html=True)
-        st.text_input("사내 공용 비밀번호를 입력하세요", type="password", on_change=password_entered, key="password")
+        # 한국어: "사내 공용 비밀번호를 입력하세요" -> 일본어 수정 완료
+        st.text_input("社内共通パスワードを入力してください", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
         st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🏢 NEXT STAFF SERVICE</h2>", unsafe_allow_html=True)
-        st.text_input("❌ 비밀번호가 틀렸습니다. 다시 입력하세요.", type="password", on_change=password_entered, key="password")
+        # 한국어: "❌ 비밀번호가 틀렸습니다. 다시 입력하세요." -> 일본어 수정 완료
+        st.text_input("❌ パスワードが間違っています。もう一度入力してください。", type="password", on_change=password_entered, key="password")
         return False
     return True
 
 if not check_password():
-    st.stop() # 비밀번호를 맞추기 전까지는 아래 코드를 절대 실행하지 않음!
+    st.stop() # パスワードを入力するまでは下のコードを実行しない
 
 # ==========================================
 # (이 아래부터는 원래 있던 기존 [0] 기본 설정 코드가 쭉 이어지면 됩니다!)
