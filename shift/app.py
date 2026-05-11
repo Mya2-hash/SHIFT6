@@ -27,7 +27,7 @@ def check_password():
         return True
 
     def password_entered():
-        if st.session_state.get("password", "") == "NEXT2026":
+        if st.session_state.get("password", "") == "nextss":
             st.session_state["password_correct"] = True
             try: st.query_params[AUTH_KEY] = AUTH_VAL
             except: pass
@@ -111,7 +111,6 @@ except: jp_holidays = {}
 weekdays_ko = ["월", "화", "수", "목", "금", "토", "일"]
 weekdays_jp = ["月", "火", "水", "木", "金", "土", "日"]
 
-# ✨ 범인 검거 구역: 빠졌던 start, end, msg_done 번역을 다시 꽉꽉 채워 넣었습니다!
 lang_dict = {
     "日本語": {
         "co_name": "株式会社NEXTスタッフサービス", "author": "制作: HWANG YOUNGSEON",
@@ -164,7 +163,6 @@ st.sidebar.header(L["load_save"])
 st.sidebar.file_uploader(L["upload"], type=["xlsx"], key="file_uploader_key", on_change=handle_upload)
 template_file = st.sidebar.file_uploader(L["template_msg"], type=["xlsx"])
 
-# --- [변수 사전 초기화 구역] ---
 if "target_month" not in st.session_state: st.session_state["target_month"] = 1
 if "loc_count_val" not in st.session_state: st.session_state["loc_count_val"] = 4
 if "num_staff_val" not in st.session_state: st.session_state["num_staff_val"] = 10
@@ -183,7 +181,8 @@ for i in range(num_locations):
     if f"lm_{i}" not in st.session_state: st.session_state[f"lm_{i}"] = 1
     if f"lc_{i}" not in st.session_state: st.session_state[f"lc_{i}"] = []
     
-    with st.sidebar.expander(f"📍 {L['loc_name']} {i+1}", expanded=False):
+    # ✨ 변경된 부분: 거점 탭의 제목이 입력된 이름(st.session_state[f"ln_{i}"])을 즉시 따라가도록 수정했습니다.
+    with st.sidebar.expander(f"📍 {st.session_state[f'ln_{i}']}", expanded=False):
         l_name = st.text_input(L["loc_name"], key=f"ln_{i}")
         l_min = st.number_input(L["loc_min"], 0, 10, key=f"lm_{i}")
         
@@ -213,7 +212,6 @@ for i in range(num_staff):
     if f"or_{i}" not in st.session_state: st.session_state[f"or_{i}"] = []
     if f"hr_{i}" not in st.session_state: st.session_state[f"hr_{i}"] = []
     
-    # 동적 데이터 정제 구역
     if st.session_state[f"af_{i}"] not in affil_options:
         st.session_state[f"af_{i}"] = L["hq_staff"] if st.session_state[f"af_{i}"] in ["本社", "본사"] else L["disp_staff"]
     st.session_state[f"or_{i}"] = [d for d in st.session_state[f"or_{i}"] if 1 <= d <= days_in_month]
