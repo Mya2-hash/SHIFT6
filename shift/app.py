@@ -8,41 +8,15 @@ import ast
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
-# --- [パスワードロック設定 (비밀번호 잠금 설정)] ---
-def check_password():
-    """パスワードが正しければTrueを返します。"""
-    def password_entered():
-        # 👇 ここに希望する社内パスワードを設定してください (여기에 사내 비밀번호를 설정하세요. 예: NEXT2026)
-        if st.session_state["password"] == "nextss":
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # セキュリティのため削除 (보안을 위해 삭제)
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🏢 NEXT STAFF SERVICE</h2>", unsafe_allow_html=True)
-        # 한국어: "사내 공용 비밀번호를 입력하세요" -> 일본어 수정 완료
-        st.text_input("社内共通パスワードを入力してください", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🏢 NEXT STAFF SERVICE</h2>", unsafe_allow_html=True)
-        # 한국어: "❌ 비밀번호가 틀렸습니다. 다시 입력하세요." -> 일본어 수정 완료
-        st.text_input("❌ パスワードが間違っています。もう一度入力してください。", type="password", on_change=password_entered, key="password")
-        return False
-    return True
-
-if not check_password():
-    st.stop() # パスワードを入力するまでは下のコードを実行しない
-
-# ==========================================
-# (이 아래부터는 원래 있던 기존 [0] 기본 설정 코드가 쭉 이어지면 됩니다!)
-# ==========================================
+# --- [0] 기본 설정 및 세션 초기화 ---
 st.set_page_config(page_title="2026 Smart Scheduler", layout="wide", page_icon="📅")
+
 def handle_upload():
     uploader = st.session_state.get('file_uploader_key')
     if uploader is not None:
         try:
             xls = pd.ExcelFile(uploader)
+            # 1. 거점 정보 복구
             if 'Locations' in xls.sheet_names:
                 df_loc = pd.read_excel(xls, sheet_name='Locations')
                 for i, loc in enumerate(df_loc.to_dict('records')):
@@ -54,15 +28,30 @@ def handle_upload():
                         except: c_days = []
                     st.session_state[f"lc_{i}"] = c_days
 
+            # 2. 직원 정보 복구
             staff_sheet = 'Staff' if 'Staff' in xls.sheet_names else ('Sheet1' if 'Sheet1' in xls.sheet_names else None)
             if staff_sheet:
                 df_staff = pd.read_excel(xls, sheet_name=staff_sheet)
                 staff_list = df_staff.to_dict('records')
                 st.session_state['num_staff_val'] = len(staff_list)
                 for i, row in enumerate(staff_list):
-                    st.session_state[f"sn_{i}"] = str(row.get('name', f"Staff{i+1}"))
+                    # ✨ 버그 수정: 신버전(pure_name)과 구버전(name) 모두 인식하여 이름 복구
+                    s_name = row.get('pure_name', row.get('name', f"Staff{i+1}"))
+                    st.session_state[f"sn_{i}"] = str(s_name)
+                    
                     st.session_state[f"af_{i}"] = str(row.get('affiliation', "本社"))
                     st.session_state[f"to_{i}"] = int(row.get('target_off', 8))
+                    
+                    # ✨ 시간 복구 기능 추가
+                    shift_str = str(row.get('shift', '09:00-18:00'))
+                    try:
+                        s_st, s_et = shift_str.split('-')
+                        st.session_state[f"st_{i}"] = datetime.strptime(s_st.strip(), "%H:%M").time()
+                        st.session_state[f"et_{i}"] = datetime.strptime(s_et.strip(), "%H:%M").time()
+                    except:
+                        pass
+
+                    # 날짜 리스트 복구
                     for key_prefix, col_name in [("or", "off_list"), ("hr", "hq_list"), ("sl", "possible_locs")]:
                         val = row.get(col_name, [])
                         if isinstance(val, str):
@@ -87,12 +76,12 @@ lang_dict = {
         "loc_settings": "📍 2. 拠点設定", "loc_count": "拠点数", "loc_name": "拠点名", "loc_min": "人数", "closed_days": "休業曜日",
         "staff_settings": "👤 勤務者詳細設定", "name": "氏名", "affiliation": "所属", "hq_staff": "本社", "disp_staff": "派遣", "possible_locs": "投入可能拠点", 
         "total_off": "休日数", "off_req": "希望休日 (カレンダー)", "hq_req": "本社出勤日",
-        "load_save": "💾 データ管理", "upload": "バックアップアップロード", "backup_btn": "📥 全設定をバックアップ",
+        "load_save": "💾 データ管理", "upload": "バックアップ アップロード", "backup_btn": "📥 全設定をバックアップ",
         "template_msg": "📁 様式アップロード", "result_title": "📊 結果", "hq_col": "★本社出勤★", "shortage": "⚠️不足", "loc_off": "X (休み)",
-        "time_set": "⏰ 時間", "start": "開始", "end": "終了", "msg_load": "✅ ロード成功", "msg_done": "✅ 生成完了"
+        "time_set": "⏰ 勤務時間", "start": "開始", "end": "終了", "msg_load": "✅ ロード成功", "msg_done": "✅ 生成完了"
     },
     "한국어": {
-        "co_name": "株式会社NEXTスタッフサービス", "group_name": "Enrich MR Holdings", "author": "제작자: HWANG YOUNGSEON",
+        "co_name": "株式会社NEXTスタッフ서비스", "group_name": "Enrich MR Holdings", "author": "제작자: HWANG YOUNGSEON",
         "run_btn": "🚀 2026년 통합 근무표 생성", "download": "📥 근무표 다운로드",
         "settings": "⚙️ 1. 기본 설정", "days": "대상 월", "num_staff": "전체 인원", 
         "loc_settings": "📍 2. 거점 설정", "loc_count": "거점 개수", "loc_name": "거점명", "loc_min": "인원", "closed_days": "휴무 요일",
@@ -151,7 +140,6 @@ c1, c2 = st.columns(2)
 affil_options = [L["hq_staff"], L["disp_staff"]]
 
 for i in range(num_staff):
-    # ✨ 절대 에러가 나지 않도록 .get()으로 모든 데이터를 감쌉니다.
     curr_sn = st.session_state.get(f"sn_{i}", f"Staff{i+1}")
     curr_af = st.session_state.get(f"af_{i}", affil_options[0])
     curr_to = st.session_state.get(f"to_{i}", 8)
@@ -159,26 +147,23 @@ for i in range(num_staff):
     curr_hr = st.session_state.get(f"hr_{i}", [])
     curr_sl = st.session_state.get(f"sl_{i}", [])
     
-    # 언어 호환성 보정
     if curr_af not in affil_options:
         curr_af = L["hq_staff"] if curr_af in ["本社", "본사"] else L["disp_staff"]
         
-    # 날짜 범위 이탈 방지 보정
     curr_or = [d for d in curr_or if 1 <= d <= days_in_month]
     curr_hr = [d for d in curr_hr if 1 <= d <= days_in_month]
 
     with (c1 if i % 2 == 0 else c2).expander(f"👤 {curr_sn}", expanded=False):
         col_n, col_a = st.columns([2, 1])
-        
-        # 위젯 생성 (초기화된 안전한 값 주입)
         s_name = col_n.text_input(L["name"], value=curr_sn, key=f"sn_{i}", label_visibility="collapsed")
         
         af_idx = affil_options.index(curr_af) if curr_af in affil_options else 0
         s_affil = col_a.selectbox(L["affiliation"], affil_options, index=af_idx, key=f"af_{i}", label_visibility="collapsed")
         
         tc1, tc2 = st.columns(2)
-        st_t = tc1.time_input(L["start"], value=time(9, 0), key=f"st_{i}")
-        et_t = tc2.time_input(L["end"], value=time(18, 0), key=f"et_{i}")
+        # ✨ 백업된 시간 설정 불러오기
+        st_t = tc1.time_input(L["start"], value=st.session_state.get(f"st_{i}", time(9, 0)), key=f"st_{i}")
+        et_t = tc2.time_input(L["end"], value=st.session_state.get(f"et_{i}", time(18, 0)), key=f"et_{i}")
         shift_str = f"{st_t.strftime('%H:%M')}-{et_t.strftime('%H:%M')}"
         
         s_locs = st.multiselect(L["possible_locs"], location_names, default=[loc for loc in curr_sl if loc in location_names], key=f"sl_{i}")
