@@ -15,7 +15,7 @@ TEMP_FILE = ".temp_backup.xlsx"
 # --- [パスワードロック設定 (비밀번호 잠금 설정)] ---
 def check_password():
     def password_entered():
-        if st.session_state.get("password", "") == "NEXT2026":
+        if st.session_state.get("password", "") == "nextsp":
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
