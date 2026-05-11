@@ -13,7 +13,7 @@ def check_password():
     """パスワードが正しければTrueを返します。"""
     def password_entered():
         # 👇 ここに希望する社内パスワードを設定してください (여기에 사내 비밀번호를 설정하세요. 예: NEXT2026)
-        if st.session_state["password"] == "NEXT2026":
+        if st.session_state["password"] == "nextss":
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # セキュリティのため削除 (보안을 위해 삭제)
         else:
