@@ -15,8 +15,6 @@ def handle_upload():
     if st.session_state.file_uploader_key is not None:
         try:
             xls = pd.ExcelFile(st.session_state.file_uploader_key)
-            
-            # 1. 거점 정보 복구
             if 'Locations' in xls.sheet_names:
                 df_loc = pd.read_excel(xls, sheet_name='Locations')
                 loc_list = df_loc.to_dict('records')
@@ -30,29 +28,21 @@ def handle_upload():
                         except: c_days = []
                     st.session_state[f"lc_{i}"] = c_days
 
-            # 2. 직원 정보 복구
             staff_sheet = 'Staff' if 'Staff' in xls.sheet_names else ('Sheet1' if 'Sheet1' in xls.sheet_names else None)
             if staff_sheet:
                 df_staff = pd.read_excel(xls, sheet_name=staff_sheet)
                 staff_list = df_staff.to_dict('records')
                 st.session_state['num_staff_val'] = len(staff_list)
-                
                 for i, row in enumerate(staff_list):
                     st.session_state[f"sn_{i}"] = str(row.get('name', f"Staff{i+1}"))
-                    
-                    # 소속 정보 안전하게 복구
-                    af_val = str(row.get('affiliation', "本社"))
-                    st.session_state[f"af_{i}"] = af_val
-                    
+                    st.session_state[f"af_{i}"] = str(row.get('affiliation', "本社"))
                     st.session_state[f"to_{i}"] = int(row.get('target_off', 8))
-                    
                     for key_prefix, col_name in [("or", "off_list"), ("hr", "hq_list"), ("sl", "possible_locs")]:
                         val = row.get(col_name, [])
                         if isinstance(val, str):
                             try: val = ast.literal_eval(val)
                             except: val = []
                         st.session_state[f"{key_prefix}_{i}"] = val
-                    
             st.session_state['upload_msg'] = "success"
         except Exception as e:
             st.session_state['upload_msg'] = f"error: {e}"
@@ -64,63 +54,55 @@ except: jp_holidays = {}
 weekdays_ko = ["월", "화", "수", "목", "금", "토", "일"]
 weekdays_jp = ["月", "火", "水", "木", "金", "土", "日"]
 
-# --- [1] 다국어 설정 ---
 lang_dict = {
     "日本語": {
         "co_name": "株式会社NEXTスタッフサービス", "group_name": "Enrich MR Holdings", "author": "制作: HWANG YOUNGSEON",
-        "run_btn": "🚀 2026年 勤務表を生成", "download": "📥 勤務表 エクセル保存",
-        "settings": "⚙️ 1. 設定", "days": "対象月 (1~12月)", "num_staff": "全人員", 
-        "loc_settings": "📍 2. 拠点設定", "loc_count": "拠点数", "loc_name": "拠点名", "loc_min": "人数", "closed_days": "休業曜日",
-        "staff_settings": "👤 勤務者詳細設定", "name": "氏名", "affiliation": "所属", "hq_staff": "本社", "disp_staff": "派遣", "possible_locs": "投入可能拠点", 
-        "total_off": "今月の休日数", "off_req": "希望休日 (カレンダー)", "hq_req": "本社出勤日",
-        "load_save": "💾 データ管理", "upload": "バックアップアップロード", "backup_btn": "📥 全設定をバックアップ",
-        "template_msg": "📁 様式(Template) アップロード",
-        "result_title": "📊 生成結果", "hq_col": "★本社出勤★", "shortage": "⚠️不足", "loc_off": "X (休み)",
-        "time_set": "⏰ 勤務時間", "start": "開始", "end": "終了", "msg_load": "✅ ロード成功", "msg_done": "✅ 生成完了"
+        "run_btn": "🚀 2026年 勤務表를 생성", "download": "📥 勤務表 저장",
+        "settings": "⚙️ 1. 설정", "days": "월", "num_staff": "인원", 
+        "loc_settings": "📍 2. 거점 설정", "loc_count": "거점수", "loc_name": "거점명", "loc_min": "인원", "closed_days": "휴무",
+        "staff_settings": "👤 상세 설정", "name": "이름", "affiliation": "소속", "hq_staff": "本社", "disp_staff": "派遣", "possible_locs": "투입가능", 
+        "total_off": "휴일수", "off_req": "희망 휴일", "hq_req": "본사 출근",
+        "load_save": "💾 데이터 관리", "upload": "백업 업로드", "backup_btn": "📥 설정 백업",
+        "template_msg": "📁 양식 업로드", "result_title": "📊 결과", "hq_col": "★本社出勤★", "shortage": "⚠️부족", "loc_off": "X",
+        "time_set": "⏰ 시간", "start": "시작", "end": "종료", "msg_load": "✅ 로드 성공", "msg_done": "✅ 완료"
     },
     "한국어": {
         "co_name": "株式会社NEXTスタッフ서비스", "group_name": "Enrich MR Holdings", "author": "제작자: HWANG YOUNGSEON",
-        "run_btn": "🚀 2026년 통합 근무표 생성", "download": "📥 근무표 엑셀 다운로드",
-        "settings": "⚙️ 1. 기본 설정", "days": "대상 월 (1~12월)", "num_staff": "전체 인원", 
+        "run_btn": "🚀 2026년 통합 근무표 생성", "download": "📥 근무표 다운로드",
+        "settings": "⚙️ 1. 기본 설정", "days": "월", "num_staff": "전체 인원", 
         "loc_settings": "📍 2. 거점 설정", "loc_count": "거점 개수", "loc_name": "거점명", "loc_min": "인원", "closed_days": "휴무 요일",
-        "staff_settings": "👤 근무자 상세 설정", "name": "성함", "affiliation": "소속", "hq_staff": "본사", "disp_staff": "파견", "possible_locs": "투입 가능 거점", 
-        "total_off": "목표 휴무", "off_req": "희망 휴일 (달력)", "hq_req": "본사 출사일",
-        "load_save": "💾 데이터 관리", "upload": "백업 엑셀 업로드", "backup_btn": "📥 모든 설정 백업하기",
-        "template_msg": "📁 엑셀 양식(Template) 업로드",
-        "result_title": "📊 생성 결과", "hq_col": "★본사출사★", "shortage": "⚠️부족", "loc_off": "X (휴무)",
-        "time_set": "⏰ 근무 시간", "start": "시작", "end": "종료", "msg_load": "✅ 로드 성공", "msg_done": "✅ 생성 완료"
+        "staff_settings": "👤 상세 설정", "name": "성함", "affiliation": "소속", "hq_staff": "본사", "disp_staff": "파견", "possible_locs": "투입 가능", 
+        "total_off": "목표 휴무", "off_req": "희망 휴일", "hq_req": "본사 출사일",
+        "load_save": "💾 데이터 관리", "upload": "백업 업로드", "backup_btn": "📥 설정 백업",
+        "template_msg": "📁 양식 업로드", "result_title": "📊 결과", "hq_col": "★본사출사★", "shortage": "⚠️부족", "loc_off": "X",
+        "time_set": "⏰ 시간", "start": "시작", "end": "종료", "msg_load": "✅ 로드 성공", "msg_done": "✅ 완료"
     }
 }
 
-selected_lang = st.sidebar.selectbox("🌐 言語 / 언어", ["日本語", "한국어"], index=0)
+selected_lang = st.sidebar.selectbox("🌐 Language", ["日本語", "한국어"], index=0)
 L = lang_dict[selected_lang]
 weekdays_active = weekdays_jp if selected_lang == "日本語" else weekdays_ko
 
-# --- [2] 디자인 ---
 st.markdown(f"""
     <style>
     .header-bar {{ position: fixed; top: 0; left: 0; width: 100%; background: #1E3A8A; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }}
     .stApp {{ margin-top: 60px; }}
-    .stButton>button {{ width: 100%; background-color: #1E3A8A !important; color: white !important; font-weight: bold; border-radius: 8px; height: 3.5em; }}
+    .stButton>button {{ width: 100%; background-color: #1E3A8A !important; color: white !important; font-weight: bold; height: 3.5em; }}
     </style>
     <div class="header-bar"><span>🏢 {L['co_name']} ({L['group_name']})</span><span>{L['author']}</span></div>
     """, unsafe_allow_html=True)
 
-# --- [3] 사이드바 ---
 st.sidebar.header(L["load_save"])
 st.sidebar.file_uploader(L["upload"], type=["xlsx"], key="file_uploader_key", on_change=handle_upload)
 template_file = st.sidebar.file_uploader(L["template_msg"], type=["xlsx"])
-st.sidebar.divider()
 
 target_month = st.sidebar.number_input(L["days"], 1, 12, 1)
 days_in_month = 28 if target_month == 2 else (30 if target_month in [4,6,9,11] else 31)
 
 def format_day(d):
     curr_d = date(2026, target_month, d)
-    wd = weekdays_active[curr_d.weekday()]
-    return f"{d}日 ({wd})" if selected_lang == "日本語" else f"{d}일 ({wd})"
+    return f"{d} ({weekdays_active[curr_d.weekday()]})"
 
-# 거점 설정
 num_locations = st.sidebar.number_input(L["loc_count"], 1, 10, value=st.session_state.get('loc_count_val', 4), key='loc_count_val')
 location_names = []; location_configs = {}
 for i in range(num_locations):
@@ -128,15 +110,11 @@ for i in range(num_locations):
         l_name = st.text_input(L["loc_name"], key=f"ln_{i}")
         l_min = st.number_input(L["loc_min"], 0, 10, key=f"lm_{i}")
         saved_closed = st.session_state.get(f"lc_{i}", [])
-        default_idx = [weekdays_ko.index(d) for d in saved_closed if d in weekdays_ko]
-        default_display = [weekdays_active[idx] for idx in default_idx]
-        l_closed_display = st.multiselect(L["closed_days"], weekdays_active, default=default_display, key=f"lc_disp_{i}")
+        l_closed_display = st.multiselect(L["closed_days"], weekdays_active, default=[weekdays_active[weekdays_ko.index(d)] for d in saved_closed if d in weekdays_ko], key=f"lc_disp_{i}")
         l_closed = [weekdays_ko[weekdays_active.index(d)] for d in l_closed_display]
         st.session_state[f"lc_{i}"] = l_closed
-        if l_name:
-            location_names.append(l_name); location_configs[l_name] = {"min": l_min, "closed": l_closed}
+        if l_name: location_names.append(l_name); location_configs[l_name] = {"min": l_min, "closed": l_closed}
 
-# --- [4] 직원 설정 ---
 num_staff = st.sidebar.slider(L["num_staff"], 1, 30, value=st.session_state.get('num_staff_val', 10), key='num_staff_val')
 st.header(L["staff_settings"])
 staff_data = []
@@ -144,28 +122,14 @@ c1, c2 = st.columns(2)
 affil_options = [L["hq_staff"], L["disp_staff"]]
 
 for i in range(num_staff):
-    # ✨ 에러 차단 안전장치: 세션 강제 초기화 및 언어 동기화
     if f"sn_{i}" not in st.session_state: st.session_state[f"sn_{i}"] = f"Staff{i+1}"
     if f"af_{i}" not in st.session_state: st.session_state[f"af_{i}"] = affil_options[0]
     
-    curr_af = st.session_state[f"af_{i}"]
-    if curr_af not in affil_options:
-        if curr_af in ["본사", "本社"]: curr_af = L["hq_staff"]
-        elif curr_af in ["파견", "派遣"]: curr_af = L["disp_staff"]
-        else: curr_af = affil_options[0]
-        st.session_state[f"af_{i}"] = curr_af
-
-    # 날짜 범위 이탈 에러(ex: 2월에 31일 선택) 차단
-    for key_or_hr in [f"or_{i}", f"hr_{i}"]:
-        if key_or_hr in st.session_state:
-            st.session_state[key_or_hr] = [d for d in st.session_state[key_or_hr] if 1 <= d <= days_in_month]
-
     with (c1 if i % 2 == 0 else c2).expander(f"👤 {st.session_state[f'sn_{i}']}", expanded=False):
         col_n, col_a = st.columns([2, 1])
         s_name = col_n.text_input(L["name"], key=f"sn_{i}", label_visibility="collapsed")
         s_affil = col_a.selectbox(L["affiliation"], affil_options, key=f"af_{i}", label_visibility="collapsed")
         
-        st.write(f"**{L['time_set']}**")
         tc1, tc2 = st.columns(2)
         st_t = tc1.time_input(L["start"], value=time(9, 0), key=f"st_{i}")
         et_t = tc2.time_input(L["end"], value=time(18, 0), key=f"et_{i}")
@@ -176,49 +140,35 @@ for i in range(num_staff):
         off_l = st.multiselect(L["off_req"], range(1, days_in_month + 1), key=f"or_{i}", format_func=format_day)
         hq_l = st.multiselect(L["hq_req"], range(1, days_in_month + 1), key=f"hr_{i}", format_func=format_day)
         
-        staff_data.append({
-            "name": f"{s_name} ({s_affil})", "pure_name": s_name, "affiliation": s_affil,
-            "shift": shift_str, "possible_locs": s_locs, "target_off": t_off, "off_list": off_l, "hq_list": hq_l
-        })
+        staff_data.append({"name": s_name, "affiliation": s_affil, "shift": shift_str, "possible_locs": s_locs, "target_off": t_off, "off_list": off_l, "hq_list": hq_l})
 
-# 통합 백업
 if staff_data:
     out_cfg = io.BytesIO()
     with pd.ExcelWriter(out_cfg, engine='openpyxl') as writer:
-        pd.DataFrame(staff_data).drop(columns=['name']).to_excel(writer, index=False, sheet_name='Staff')
+        pd.DataFrame(staff_data).to_excel(writer, index=False, sheet_name='Staff')
         loc_backup = [{"loc_name": k, "loc_min": v['min'], "closed_days": str(v['closed'])} for k, v in location_configs.items()]
         pd.DataFrame(loc_backup).to_excel(writer, index=False, sheet_name='Locations')
     st.sidebar.download_button(L["backup_btn"], out_cfg.getvalue(), f"full_backup.xlsx")
 
-# --- [5] 근무표 생성 ---
-st.divider()
 if st.button(L["run_btn"]):
     schedule_results = []; holiday_list = []
     for d in range(1, days_in_month + 1):
         curr_d = date(2026, target_month, d); curr_weekday_ko = weekdays_ko[curr_d.weekday()]
-        is_h = curr_d in jp_holidays or curr_d.weekday() >= 5
-        if is_h: holiday_list.append(d)
+        if curr_d in jp_holidays or curr_d.weekday() >= 5: holiday_list.append(d)
         res = {"Date": f"{d} ({weekdays_active[curr_d.weekday()]})"}; assigned = []
-        
-        hq = [f"{s['pure_name']}({s['shift']})" for s in staff_data if d in s['hq_list']]
-        res[L["hq_col"]] = ", ".join(hq) if hq else "-"
-        assigned.extend([s['pure_name'] for s in staff_data if d in s['hq_list']])
-        
-        avail = [s for s in staff_data if s['pure_name'] not in assigned and d not in s['off_list']]
+        hq = [f"{s['name']}({s['shift']})" for s in staff_data if d in s['hq_list']]
+        res[L["hq_col"]] = ", ".join(hq) if hq else "-"; assigned.extend([s['name'] for s in staff_data if d in s['hq_list']])
+        avail = [s for s in staff_data if s['name'] not in assigned and d not in s['off_list']]
         random.shuffle(avail)
         for loc, config in location_configs.items():
             if curr_weekday_ko in config['closed']: res[loc] = L["loc_off"]
             else:
-                needed = config['min']
-                sel = [s for s in avail if loc in s['possible_locs']][:needed]
-                res[loc] = ", ".join([f"{s['pure_name']}({s['shift']})" for s in sel]) if sel else L["shortage"]
-                for s in sel: assigned.append(s['pure_name']); avail.remove(s)
+                sel = [s for s in avail if loc in s['possible_locs']][:config['min']]
+                res[loc] = ", ".join([f"{s['name']}({s['shift']})" for s in sel]) if sel else L["shortage"]
+                for s in sel: assigned.append(s['name']); avail.remove(s)
         schedule_results.append(res)
-
     df_res = pd.DataFrame(schedule_results)
-    st.subheader(L["result_title"])
     st.dataframe(df_res.style.apply(lambda row: ['color: red' if int(row['Date'].split()[0]) in holiday_list else '' for _ in row], axis=1), use_container_width=True)
-    
     out_res = io.BytesIO()
     if template_file:
         wb = load_workbook(template_file); ws = wb.active
@@ -227,8 +177,5 @@ if st.button(L["run_btn"]):
         wb.save(out_res)
     else:
         with pd.ExcelWriter(out_res, engine='openpyxl') as writer: df_res.to_excel(writer, index=False)
-    
     st.success(L["msg_done"])
-    st.download_button(L["download"], out_res.getvalue(), f"Schedule_{target_month}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-st.markdown(f'<div class="footer">© 2026 {L["co_name"]}. {L["author"]}</div>', unsafe_allow_html=True)
+    st.download_button(L["download"], out_res.getvalue(), f"Schedule_{target_month}.xlsx")
