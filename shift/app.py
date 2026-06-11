@@ -25,7 +25,7 @@ def check_password():
         return True
 
     def password_entered():
-        if st.session_state.get("password", "") == "NEXT2026":
+        if st.session_state.get("password", "") == "nextss":
             st.session_state["password_correct"] = True
             try: st.query_params[AUTH_KEY] = AUTH_VAL
             except: pass
